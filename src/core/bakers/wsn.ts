@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { BakedMap, RasterizedSurface } from "../types";
 import type { MeshBVH } from "three-mesh-bvh";
-import { castRay, faceIndices, interpolateVec3, packNormal } from "./shared";
+import { castRay, faceIndices, interpolateVec3, packNormal, yieldEveryMs } from "./shared";
 
 const _origin = new THREE.Vector3();
 const _dir = new THREE.Vector3();
@@ -13,22 +13,27 @@ const _hitNormal = new THREE.Vector3();
  * highpoly's vertex normals at the impact point and store as a world-space
  * normal map.
  */
-export function bakeWSN(
+export async function bakeWSN(
   surface: RasterizedSurface,
   highGeometry: THREE.BufferGeometry,
   highBVH: MeshBVH,
   cageOffset: number,
   maxDist: number,
   onProgress?: (pct: number) => void,
-): BakedMap {
+): Promise<BakedMap> {
   const { width, height, position, normal, mask } = surface;
   const out = new Uint8ClampedArray(width * height * 4);
   const highNormal = highGeometry.getAttribute("normal") as THREE.BufferAttribute;
 
   let nextReport = 0;
   const total = mask.length;
+  let lastYield = performance.now();
   for (let i = 0; i < total; i++) {
     if (!mask[i]) continue;
+    if (i % 8192 === 0 && performance.now() - lastYield > 200) {
+      await yieldEveryMs();
+      lastYield = performance.now();
+    }
     const o = i * 4;
     _origin.set(
       position[o] + normal[o] * cageOffset,
@@ -54,7 +59,7 @@ export function bakeWSN(
 
     if (onProgress && i >= nextReport) {
       onProgress(i / total);
-      nextReport = i + Math.ceil(total / 100);
+      nextReport = i + Math.ceil(total / 25);
     }
   }
   onProgress?.(1);

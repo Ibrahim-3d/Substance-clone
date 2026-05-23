@@ -15,32 +15,43 @@ const MAP_LIST: Array<{ key: MapKind; label: string; hint?: string }> = [
 ];
 
 export function Inspector() {
-  const store = useBakeStore();
-  const { settings, baking, lowpoly, highpoly } = store;
+  // Granular selectors so progress updates during a bake (which only touch
+  // `progress`) don't re-render this panel.
+  const settings = useBakeStore((s) => s.settings);
+  const baking = useBakeStore((s) => s.baking);
+  const lowpoly = useBakeStore((s) => s.lowpoly);
+  const highpoly = useBakeStore((s) => s.highpoly);
+  const showCage = useBakeStore((s) => s.showCage);
+  const showHighpoly = useBakeStore((s) => s.showHighpoly);
+  const setSettings = useBakeStore((s) => s.setSettings);
+  const setEnabled = useBakeStore((s) => s.setEnabled);
+  const setShowCage = useBakeStore((s) => s.setShowCage);
+  const setShowHighpoly = useBakeStore((s) => s.setShowHighpoly);
 
   const canBake = !!lowpoly && !!highpoly && !baking;
 
   const bake = async () => {
-    if (!lowpoly || !highpoly) return;
-    store.setError(null);
-    store.setBaking(true);
-    store.setMaps([]);
+    const s = useBakeStore.getState();
+    if (!s.lowpoly || !s.highpoly) return;
+    s.setError(null);
+    s.setBaking(true);
+    s.setMaps([]);
     try {
       const maps = await runBake(
         {
-          lowpoly,
-          highpoly,
-          settings,
-          transferSource: store.transferSource ?? undefined,
+          lowpoly: s.lowpoly,
+          highpoly: s.highpoly,
+          settings: s.settings,
+          transferSource: s.transferSource ?? undefined,
         },
-        (p) => store.setProgress(p),
+        (p) => useBakeStore.getState().setProgress(p),
       );
-      store.setMaps(maps);
+      useBakeStore.getState().setMaps(maps);
     } catch (e) {
-      store.setError(e instanceof Error ? e.message : String(e));
+      useBakeStore.getState().setError(e instanceof Error ? e.message : String(e));
     } finally {
-      store.setBaking(false);
-      store.setProgress(null);
+      useBakeStore.getState().setBaking(false);
+      useBakeStore.getState().setProgress(null);
     }
   };
 
@@ -66,7 +77,7 @@ export function Inspector() {
                   ? "bg-orange-500 text-zinc-950"
                   : "bg-zinc-800 text-zinc-200 hover:bg-zinc-700"
               }`}
-              onClick={() => store.setSettings({ resolution: r })}
+              onClick={() => setSettings({ resolution: r })}
             >
               {r >= 1024 ? `${r / 1024}K` : r}
             </button>
@@ -82,22 +93,22 @@ export function Inspector() {
           min={0}
           max={1}
           step={0.005}
-          onChange={(v) => store.setSettings({ cageOffset: v })}
+          onChange={(v) => setSettings({ cageOffset: v })}
         />
         <div className="mt-2 flex items-center justify-between text-xs text-zinc-400">
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={store.showCage}
-              onChange={(e) => store.setShowCage(e.target.checked)}
+              checked={showCage}
+              onChange={(e) => setShowCage(e.target.checked)}
             />
             Show cage
           </label>
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={store.showHighpoly}
-              onChange={(e) => store.setShowHighpoly(e.target.checked)}
+              checked={showHighpoly}
+              onChange={(e) => setShowHighpoly(e.target.checked)}
             />
             Show highpoly
           </label>
@@ -114,7 +125,7 @@ export function Inspector() {
                   <input
                     type="checkbox"
                     checked={settings.enabled[key]}
-                    onChange={(e) => store.setEnabled(key, e.target.checked)}
+                    onChange={(e) => setEnabled(key, e.target.checked)}
                   />
                   {label}
                 </span>
@@ -134,7 +145,7 @@ export function Inspector() {
             min={4}
             max={128}
             step={4}
-            onChange={(v) => store.setSettings({ aoSamples: v })}
+            onChange={(v) => setSettings({ aoSamples: v })}
             format={(v) => `${v} spp`}
           />
           <Slider
@@ -143,7 +154,7 @@ export function Inspector() {
             min={0}
             max={5}
             step={0.05}
-            onChange={(v) => store.setSettings({ aoMaxDist: v })}
+            onChange={(v) => setSettings({ aoMaxDist: v })}
             format={(v) => (v === 0 ? "auto" : v.toFixed(2))}
           />
         </section>
@@ -157,7 +168,7 @@ export function Inspector() {
             className="mt-1 w-full rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-sm"
             value={settings.transferChannel}
             onChange={(e) =>
-              store.setSettings({
+              setSettings({
                 transferChannel: e.target.value as typeof settings.transferChannel,
               })
             }
@@ -183,11 +194,12 @@ export function Inspector() {
           min={0}
           max={16}
           step={1}
-          onChange={(v) => store.setSettings({ dilatePadding: v })}
+          onChange={(v) => setSettings({ dilatePadding: v })}
         />
       </section>
 
       <button
+        data-testid="bake-button"
         className="mt-auto rounded-md bg-orange-500 px-3 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-40"
         disabled={!canBake}
         onClick={() => void bake()}

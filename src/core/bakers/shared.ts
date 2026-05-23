@@ -102,6 +102,28 @@ export function interpolateVec2(
   return out;
 }
 
+/**
+ * Yield to the event loop so React can repaint progress UI between chunks of
+ * synchronous baker work. Uses MessageChannel which (unlike setTimeout) is not
+ * clamped or throttled, so unfocused/headless tabs still progress quickly.
+ */
+let _yieldChannel: MessageChannel | null = null;
+let _yieldResolver: (() => void) | null = null;
+export function yieldEveryMs(): Promise<void> {
+  if (!_yieldChannel) {
+    _yieldChannel = new MessageChannel();
+    _yieldChannel.port1.onmessage = () => {
+      const r = _yieldResolver;
+      _yieldResolver = null;
+      r?.();
+    };
+  }
+  return new Promise<void>((res) => {
+    _yieldResolver = res;
+    _yieldChannel!.port2.postMessage(0);
+  });
+}
+
 /** Pack a signed [-1,1] normal vector into RGB8 [0,255]. */
 export function packNormal(out: Uint8ClampedArray, off: number, x: number, y: number, z: number) {
   out[off] = Math.max(0, Math.min(255, Math.round((x * 0.5 + 0.5) * 255)));

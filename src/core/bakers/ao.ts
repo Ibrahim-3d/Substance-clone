@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { BakedMap, RasterizedSurface } from "../types";
 import type { MeshBVH } from "three-mesh-bvh";
-import { castRay } from "./shared";
+import { castRay, yieldEveryMs } from "./shared";
 
 const _origin = new THREE.Vector3();
 const _dir = new THREE.Vector3();
@@ -41,7 +41,7 @@ function cosineHemisphere(u: number, v: number, out: THREE.Vector3) {
  * `spread` lerps the basis from pure-tangent (1) toward pure-up (0) to soften
  * AO contact — matches the "spread" slider in xNormal/Marmoset.
  */
-export function bakeAO(
+export async function bakeAO(
   surface: RasterizedSurface,
   highGeometry: THREE.BufferGeometry,
   highBVH: MeshBVH,
@@ -51,7 +51,7 @@ export function bakeAO(
   aoMaxDist: number,
   _spread: number,
   onProgress?: (pct: number) => void,
-): BakedMap {
+): Promise<BakedMap> {
   const { width, height, position, normal, tangent, mask } = surface;
   const out = new Uint8ClampedArray(width * height * 4);
   // Pre-compute sample directions in tangent-up space.
@@ -70,8 +70,13 @@ export function bakeAO(
 
   let nextReport = 0;
   const total = mask.length;
+  let lastYield = performance.now();
   for (let i = 0; i < total; i++) {
     if (!mask[i]) continue;
+    if (i % 2048 === 0 && performance.now() - lastYield > 200) {
+      await yieldEveryMs();
+      lastYield = performance.now();
+    }
     const o = i * 4;
     _N.set(normal[o], normal[o + 1], normal[o + 2]);
     _T.set(tangent[o], tangent[o + 1], tangent[o + 2]);
@@ -113,7 +118,7 @@ export function bakeAO(
 
     if (onProgress && i >= nextReport) {
       onProgress(i / total);
-      nextReport = i + Math.ceil(total / 100);
+      nextReport = i + Math.ceil(total / 25);
     }
   }
   onProgress?.(1);

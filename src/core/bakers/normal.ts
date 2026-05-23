@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { BakedMap, RasterizedSurface } from "../types";
 import type { MeshBVH } from "three-mesh-bvh";
-import { castRay, faceIndices, interpolateVec3, packNormal } from "./shared";
+import { castRay, faceIndices, interpolateVec3, packNormal, yieldEveryMs } from "./shared";
 
 const _origin = new THREE.Vector3();
 const _dir = new THREE.Vector3();
@@ -18,14 +18,14 @@ const _N = new THREE.Vector3();
  * Correctness hinges on the lowpoly tangents (mikktspace ideally). v0.1 uses
  * three.js's built-in tangents which are acceptable for most assets.
  */
-export function bakeNormal(
+export async function bakeNormal(
   surface: RasterizedSurface,
   highGeometry: THREE.BufferGeometry,
   highBVH: MeshBVH,
   cageOffset: number,
   maxDist: number,
   onProgress?: (pct: number) => void,
-): BakedMap {
+): Promise<BakedMap> {
   const { width, height, position, normal, tangent, mask } = surface;
   const out = new Uint8ClampedArray(width * height * 4);
   // Default neutral normal for unfilled pixels — 0.5,0.5,1.0 in [0,1] = (0,0,1).
@@ -37,8 +37,13 @@ export function bakeNormal(
 
   let nextReport = 0;
   const total = mask.length;
+  let lastYield = performance.now();
   for (let i = 0; i < total; i++) {
     if (!mask[i]) continue;
+    if (i % 8192 === 0 && performance.now() - lastYield > 200) {
+      await yieldEveryMs();
+      lastYield = performance.now();
+    }
     const o = i * 4;
 
     _N.set(normal[o], normal[o + 1], normal[o + 2]);
@@ -79,7 +84,7 @@ export function bakeNormal(
 
     if (onProgress && i >= nextReport) {
       onProgress(i / total);
-      nextReport = i + Math.ceil(total / 100);
+      nextReport = i + Math.ceil(total / 25);
     }
   }
   onProgress?.(1);

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import * as THREE from "three";
 import type { AssetMesh, BakeProgress, BakeSettings, BakedMap, MapKind } from "../core/types";
+import { suggestCageOffset } from "../core/bake";
 
 const defaultEnabled: Record<MapKind, boolean> = {
   position: false,
@@ -30,6 +31,7 @@ export interface BakeStore {
   applyBakedPreview: boolean;
   selectedMap: MapKind | null;
 
+  cageUserModified: boolean;
   setLowpoly: (m: AssetMesh | null) => void;
   setHighpoly: (m: AssetMesh | null) => void;
   setTransferSource: (tex: THREE.Texture | null, name: string | null) => void;
@@ -69,12 +71,30 @@ export const useBakeStore = create<BakeStore>((set) => ({
   showHighpoly: false,
   applyBakedPreview: true,
   selectedMap: null,
+  cageUserModified: false,
 
-  setLowpoly: (m) => set({ lowpoly: m }),
-  setHighpoly: (m) => set({ highpoly: m }),
+  setLowpoly: (m) =>
+    set((s) => {
+      const next: Partial<BakeStore> = { lowpoly: m };
+      if (m && s.highpoly && !s.cageUserModified) {
+        next.settings = { ...s.settings, cageOffset: suggestCageOffset(m, s.highpoly) };
+      }
+      return next as BakeStore;
+    }),
+  setHighpoly: (m) =>
+    set((s) => {
+      const next: Partial<BakeStore> = { highpoly: m };
+      if (m && s.lowpoly && !s.cageUserModified) {
+        next.settings = { ...s.settings, cageOffset: suggestCageOffset(s.lowpoly, m) };
+      }
+      return next as BakeStore;
+    }),
   setTransferSource: (tex, name) => set({ transferSource: tex, transferSourceName: name }),
   setSettings: (patch) =>
-    set((s) => ({ settings: { ...s.settings, ...patch } })),
+    set((s) => ({
+      settings: { ...s.settings, ...patch },
+      cageUserModified: patch.cageOffset !== undefined ? true : s.cageUserModified,
+    })),
   setEnabled: (kind, on) =>
     set((s) => ({
       settings: { ...s.settings, enabled: { ...s.settings.enabled, [kind]: on } },

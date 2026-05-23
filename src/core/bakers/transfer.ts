@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { BakedMap, RasterizedSurface } from "../types";
 import type { MeshBVH } from "three-mesh-bvh";
-import { castRay, faceIndices, interpolateVec2 } from "./shared";
+import { castRay, faceIndices, interpolateVec2, yieldEveryMs } from "./shared";
 
 const _origin = new THREE.Vector3();
 const _dir = new THREE.Vector3();
@@ -79,7 +79,7 @@ function sampleBilinear(
  * THE WEDGE: re-project any UV-mapped channel from the highpoly onto the
  * lowpoly's UVs. Pass in whichever source texture the user picked.
  */
-export function bakeTransfer(
+export async function bakeTransfer(
   surface: RasterizedSurface,
   highGeometry: THREE.BufferGeometry,
   highBVH: MeshBVH,
@@ -88,7 +88,7 @@ export function bakeTransfer(
   maxDist: number,
   label: string,
   onProgress?: (pct: number) => void,
-): BakedMap {
+): Promise<BakedMap> {
   const { width, height, position, normal, mask } = surface;
   const out = new Uint8ClampedArray(width * height * 4);
   const highUV = highGeometry.getAttribute("uv") as THREE.BufferAttribute | undefined;
@@ -103,8 +103,13 @@ export function bakeTransfer(
   const tmp: [number, number, number, number] = [0, 0, 0, 0];
   let nextReport = 0;
   const total = mask.length;
+  let lastYield = performance.now();
   for (let i = 0; i < total; i++) {
     if (!mask[i]) continue;
+    if (i % 8192 === 0 && performance.now() - lastYield > 200) {
+      await yieldEveryMs();
+      lastYield = performance.now();
+    }
     const o = i * 4;
     _N.set(normal[o], normal[o + 1], normal[o + 2]);
     _origin.set(
@@ -134,7 +139,7 @@ export function bakeTransfer(
 
     if (onProgress && i >= nextReport) {
       onProgress(i / total);
-      nextReport = i + Math.ceil(total / 100);
+      nextReport = i + Math.ceil(total / 25);
     }
   }
   onProgress?.(1);

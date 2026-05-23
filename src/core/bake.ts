@@ -25,6 +25,14 @@ function suggestMaxRayDist(low: AssetMesh, high: AssetMesh): number {
   return Math.max(size.x, size.y, size.z) || 1;
 }
 
+/** Sane cage offset default — roughly 2% of the bbox diagonal. */
+export function suggestCageOffset(low: AssetMesh, high: AssetMesh): number {
+  const combined = low.bbox.clone().union(high.bbox);
+  const size = new THREE.Vector3();
+  combined.getSize(size);
+  return Math.max(0.001, size.length() * 0.02);
+}
+
 export async function runBake(
   inputs: BakeInputs,
   onProgress: (p: BakeProgress) => void,
@@ -60,7 +68,7 @@ export async function runBake(
     if (kind === "curvature" && !wsnMap) {
       // Need WSN to derive curvature — silently bake one even if not requested.
       onProgress({ kind: "wsn", pct: 0, message: "Baking WSN (for curvature)…" });
-      wsnMap = bakeWSN(surface, highpoly.geometry, bvh, settings.cageOffset, maxDist, (p) =>
+      wsnMap = await bakeWSN(surface, highpoly.geometry, bvh, settings.cageOffset, maxDist, (p) =>
         onProgress({ kind: "wsn", pct: p }),
       );
       dilate(wsnMap.data, surface.mask, surface.width, surface.height, padding);
@@ -76,19 +84,19 @@ export async function runBake(
         break;
       case "wsn":
         if (!wsnMap) {
-          wsnMap = bakeWSN(surface, highpoly.geometry, bvh, settings.cageOffset, maxDist, (p) =>
+          wsnMap = await bakeWSN(surface, highpoly.geometry, bvh, settings.cageOffset, maxDist, (p) =>
             onProgress({ kind, pct: p }),
           );
         }
         map = wsnMap;
         break;
       case "normal":
-        map = bakeNormal(surface, highpoly.geometry, bvh, settings.cageOffset, maxDist, (p) =>
+        map = await bakeNormal(surface, highpoly.geometry, bvh, settings.cageOffset, maxDist, (p) =>
           onProgress({ kind, pct: p }),
         );
         break;
       case "ao":
-        map = bakeAO(
+        map = await bakeAO(
           surface,
           highpoly.geometry,
           bvh,
@@ -105,7 +113,7 @@ export async function runBake(
         if (!src) {
           throw new Error("Transfer bake requires a source texture on the highpoly.");
         }
-        map = bakeTransfer(
+        map = await bakeTransfer(
           surface,
           highpoly.geometry,
           bvh,
