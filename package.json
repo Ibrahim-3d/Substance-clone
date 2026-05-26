@@ -1,8 +1,28 @@
 {
-  "name": "substance-clone",
+  "name": "bakestack",
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "description": "BakeStack — a free, browser-based PBR map baker and open-source Substance Painter alternative. Bake normal, AO, curvature, position and texture-transfer maps from highpoly to lowpoly, entirely in the browser.",
+  "homepage": "https://ibrahim-3d.github.io/Substance-clone/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ibrahim-3d/Substance-clone.git"
+  },
+  "author": "Ibrahim Elsayed",
+  "license": "MIT",
+  "keywords": [
+    "pbr",
+    "texture-baking",
+    "normal-map",
+    "ambient-occlusion",
+    "substance-painter-alternative",
+    "three-js",
+    "react-three-fiber",
+    "webgl",
+    "3d",
+    "baker"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

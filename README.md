@@ -1,56 +1,102 @@
-# BakeStack
+<div align="center">
 
-A browser-based PBR map baker. Drag in a textured highpoly mesh and a UV-unwrapped lowpoly, click Bake, and get every map projected onto the lowpoly's UV space — **including the highpoly's diffuse / roughness / metallic / opacity**, which Substance Painter can't.
+# 🔥 BakeStack
 
-> See `prd.md` for the full product spec.
+### A free, browser-based PBR map baker — the open-source Substance Painter alternative for baking.
 
-## What ships in v0.1
+**Drag in a highpoly + lowpoly, click Bake, download your maps.** No install, no account, no GPU farm — it runs entirely in your browser.
 
-- Drag-drop GLB / GLTF / OBJ / FBX for both lowpoly and highpoly.
-- Six baked map types out of one ray-cast pipeline:
-  - Normal map (tangent-space)
-  - World-space normal
-  - Position (in highpoly bbox)
-  - Ambient occlusion (cosine-weighted Hammersley hemisphere)
-  - Curvature (Sobel of world-space normal)
-  - **Texture transfer** — the wedge. Project any UV-mapped channel from the highpoly's source texture onto the lowpoly's UVs.
-- Configurable cage offset, AO sample count, edge-padding dilation, output resolution (512² → 4K).
-- Live R3F preview with the baked maps applied to the lowpoly, plus toggleable cage and highpoly overlays.
-- PNG download (single map / all maps).
-- Packed GLB export with the bakes wired up to a `MeshStandardMaterial`.
-- IndexedDB-persisted bake settings.
+[**▶ Try the Live Demo**](https://ibrahim-3d.github.io/Substance-clone/) · [Features](#-features) · [How it works](#-how-it-works) · [Run locally](#-run-locally) · [Roadmap](#-roadmap)
 
-Try it without any uploads: click **Load Sample** in the top bar, then **Bake All**. The sample assets are a procedural bumpy sphere highpoly with a textured surface and a smooth lowpoly sphere.
+[![Live Demo](https://img.shields.io/badge/demo-live-22c55e?style=flat-square)](https://ibrahim-3d.github.io/Substance-clone/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](#-license)
+[![Built with React Three Fiber](https://img.shields.io/badge/built%20with-React%20Three%20Fiber-000?style=flat-square)](https://github.com/pmndrs/react-three-fiber)
+[![Runs in browser](https://img.shields.io/badge/runs%20in-browser-f97316?style=flat-square)](https://ibrahim-3d.github.io/Substance-clone/)
 
-## How it works
+</div>
+
+---
+
+## What is BakeStack?
+
+**BakeStack** is a free, open-source **PBR texture baker that runs 100% in your web browser**. It's a lightweight **Substance Painter / Marmoset Toolbag alternative** focused on one job done well: **baking maps from a highpoly mesh onto a UV-unwrapped lowpoly**.
+
+Upload a textured highpoly and a lowpoly, hit **Bake**, and get every map projected into the lowpoly's UV space — including the highpoly's **diffuse / roughness / metallic / opacity texture transfer**, something Substance Painter's baker can't do out of the box.
+
+No downloads. No license key. No cloud upload — your meshes never leave your machine.
+
+> 💡 **New here?** Skip the uploads entirely: open the [live demo](https://ibrahim-3d.github.io/Substance-clone/), click **Load Sample**, then **Bake All**.
+
+## ✨ Features
+
+- **Six bake types from one ray-cast pipeline:**
+  - 🟪 **Normal map** (tangent-space)
+  - 🌐 **World-space normal**
+  - 📍 **Position** (within highpoly bounding box)
+  - 🌑 **Ambient Occlusion** (cosine-weighted Hammersley hemisphere)
+  - 🪨 **Curvature** (Sobel of world-space normal)
+  - 🎨 **Texture transfer** — *the killer feature.* Project any UV-mapped channel (diffuse / roughness / metallic / opacity) from the highpoly's source texture onto the lowpoly's UVs.
+- **Any common format in:** drag-drop `GLB` / `GLTF` / `OBJ` / `FBX` for both meshes.
+- **Full control:** configurable cage offset, AO sample count, edge-padding dilation, and output resolution from **512² up to 4K**.
+- **Live 3D preview** (React Three Fiber) with baked maps applied to the lowpoly, plus toggleable cage and highpoly overlays.
+- **Export your way:** download single maps or all maps as PNG, or a **packed GLB** with the bakes wired into a `MeshStandardMaterial`.
+- **Remembers your setup** — bake settings persist via IndexedDB.
+
+## 🚀 Live Demo
+
+👉 **[ibrahim-3d.github.io/Substance-clone](https://ibrahim-3d.github.io/Substance-clone/)**
+
+The demo ships with procedural sample assets (a bumpy textured highpoly sphere + a smooth lowpoly sphere) so you can bake your first map in two clicks.
+
+## 🧠 How it works
 
 ```
 parse → rasterize lowpoly UVs → build BVH on highpoly → for each lowpoly texel:
-  - cast a ray from cage back through the surface to the highpoly
-  - sample the highpoly at the hit (normal / UV / source texture)
-  - transform highpoly normal into lowpoly tangent space for normal map bake
+  • cast a ray from the cage back through the surface to the highpoly
+  • sample the highpoly at the hit (normal / UV / source texture)
+  • transform highpoly normal into lowpoly tangent space for the normal bake
 → dilate UV-island borders for clean bilinear sampling
 → export
 ```
 
-The implementation is currently CPU-based (`three-mesh-bvh` accelerated raycasting). WebGPU compute shaders are the planned v0.2 fast path; they're documented in `prd.md` §5.
+The pipeline is currently CPU-based, accelerated with [`three-mesh-bvh`](https://github.com/gkjohnson/three-mesh-bvh). WebGPU compute shaders are the planned v0.2 fast path (see `prd.md` §5).
 
-## Develop
+## 🛠 Run locally
 
-```bash
+```sh
 pnpm install
 pnpm dev          # http://localhost:5173
 pnpm typecheck    # tsc -b --noEmit
 pnpm build        # tsc -b && vite build
 ```
 
-## v0.1 known limitations
+**Stack:** React 18 · TypeScript · Vite · Tailwind CSS · three.js · React Three Fiber · three-mesh-bvh · Zustand.
 
-- Tangents come from three.js's `computeTangents()`, not mikktspace. Acceptable for most assets, occasionally produces subtle seams on awkward UVs. Mikktspace WASM is on the v0.2 list.
-- EXR export is not implemented (needs tinyexr WASM). PNG-only for now.
-- All work runs on the main thread. A Web Worker / WebGPU port is the obvious next step for 4K bakes.
-- Multi-mesh "match by name" mode is not implemented — single-pair bakes only. Multiple child meshes inside a single GLB are merged into one mesh.
+## 🗺 Roadmap
 
-## License
+v0.1 is intentionally scoped. Known limitations and what's next:
 
-MIT
+- **Tangents** use three.js `computeTangents()`, not mikktspace — fine for most assets, occasionally subtle seams on awkward UVs. Mikktspace WASM is on the v0.2 list.
+- **EXR export** not yet implemented (needs tinyexr WASM) — PNG-only for now.
+- **Threading:** all work runs on the main thread today. A Web Worker / WebGPU port is the obvious next step for fast 4K bakes.
+- **Multi-mesh "match by name"** isn't implemented — single-pair bakes only (multiple child meshes in one GLB are merged).
+
+See [`prd.md`](./prd.md) for the full product spec.
+
+## ❓ FAQ
+
+**Is BakeStack really free?** Yes — MIT licensed and free forever.
+
+**Do my models get uploaded anywhere?** No. All parsing and baking happens locally in your browser; nothing is sent to a server.
+
+**How is this different from Substance Painter?** BakeStack is a focused, zero-install *baker*. It doesn't paint — but it does something Substance's baker can't: transfer the highpoly's existing texture channels (diffuse/roughness/metallic/opacity) onto the lowpoly UVs.
+
+**What browsers are supported?** Any modern desktop browser with WebGL2 (Chrome, Edge, Firefox, Safari).
+
+## 🤝 Contributing
+
+Issues and PRs welcome. Run `pnpm typecheck` before opening a PR.
+
+## 📄 License
+
+[MIT](./LICENSE) © Ibrahim Elsayed
